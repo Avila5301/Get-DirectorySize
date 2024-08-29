@@ -2,12 +2,12 @@
 $folderPath = "C:\" # Default is C:\ but you can change this to another drive or a specific path to search in
 
 # Variables to control sorting and searching
-$searchBy = "folder"  # Set to "folder" to search by folder or "file" to search by files | Default = Folder
-$sortBySize = $true   # Set to $true to sort by size | Default = True
-$sortByDate = $false  # Set to $true to sort by date modified | Default = False
+$searchBy = "file"  # Set to "folder" to search by folder or "file" to search by files
+$sortBySize = $true   # Set to $true to sort by size
+$sortByDate = $false  # Set to $true to sort by date modified
 
 # Array of folders to omit from the search
-$omitFolders = @("C:\Windows", "C:\Program Files", "C:\Users\Default", "C:\System Volume Information")
+$omitFolders = @("C:\Windows", "C:\Program Files", "C:\Users\Default", "C:\System Volume Information", "C:\Windows\System32", "C:\Windows\WinSxS", "C:\Windows\servicing")
 
 # Function to check if a folder is in the omit list
 function skipFolders($folder) {
@@ -16,15 +16,15 @@ function skipFolders($folder) {
 
 # Get the total number of directories or files for progress tracking
 $totalItems = if ($searchBy -eq "folder") {
-    (Get-ChildItem -Path $folderPath -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { -not (skipFolders $_) }).Count
+    (Get-ChildItem -Path $folderPath -Directory -Depth 1 -ErrorAction SilentlyContinue | Where-Object { -not (skipFolders $_) }).Count
 } elseif ($searchBy -eq "file") {
     (Get-ChildItem -Path $folderPath -File -Recurse -ErrorAction SilentlyContinue | Where-Object { -not (skipFolders $_) }).Count
 }
 $counter = 0
 
 if ($searchBy -eq "folder") {
-    # Get all subdirectories, calculate their sizes, and capture the Date Modified
-    $folderSizes = Get-ChildItem -Path $folderPath -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { -not (Is-OmittedFolder $_) } | ForEach-Object {
+    # Get all subdirectories (only one level deep), calculate their sizes, and capture the Date Modified
+    $folderSizes = Get-ChildItem -Path $folderPath -Directory -Depth 1 -ErrorAction SilentlyContinue | Where-Object { -not (skipFolders $_) } | ForEach-Object {
         $counter++
         Write-Progress -Activity "Processing Folders" -Status "$counter out of $totalItems" -PercentComplete (($counter / $totalItems) * 100)
         
@@ -61,7 +61,7 @@ if ($searchBy -eq "folder") {
 
 } elseif ($searchBy -eq "file") {
     # Get all files, calculate their sizes, and capture the Date Modified
-    $fileSizes = Get-ChildItem -Path $folderPath -File -Recurse -ErrorAction SilentlyContinue | Where-Object { -not (Is-OmittedFolder $_) } | ForEach-Object {
+    $fileSizes = Get-ChildItem -Path $folderPath -File -Recurse -ErrorAction SilentlyContinue | Where-Object { -not (skipFolders $_) } | ForEach-Object {
         $counter++
         Write-Progress -Activity "Processing Files" -Status "$counter out of $totalItems" -PercentComplete (($counter / $totalItems) * 100)
         
