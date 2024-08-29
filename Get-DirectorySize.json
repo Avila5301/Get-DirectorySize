@@ -1,0 +1,100 @@
+{
+    "schemaVersion": "2.2",
+    "description": "SSM document to analyze folder or file sizes with sorting and filtering options.",
+    "parameters": {
+      "folderPath": {
+        "type": "String",
+        "description": "Path to the folder you want to analyze.",
+        "default": "C:\\"
+      },
+      "searchBy": {
+        "type": "String",
+        "description": "Set to 'folder' to search by folder or 'file' to search by files.",
+        "default": "folder",
+        "allowedValues": ["folder", "file"]
+      },
+      "sortBySize": {
+        "type": "Boolean",
+        "description": "Set to true to sort by size.",
+        "default": false
+      },
+      "sortByDate": {
+        "type": "Boolean",
+        "description": "Set to true to sort by date modified.",
+        "default": true
+      },
+      "omitFolders": {
+        "type": "StringList",
+        "description": "List of folders to omit from the search.",
+        "default": ["C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)", "C:\\Users\\Default", "C:\\System Volume Information"]
+      }
+    },
+    "mainSteps": [
+      {
+        "action": "aws:runPowerShellScript",
+        "name": "analyzeFolderOrFile",
+        "inputs": {
+          "runCommand": [
+            "$folderPath = '{{folderPath}}'",
+            "$searchBy = '{{searchBy}}'",
+            "$sortBySize = [System.Convert]::ToBoolean('{{sortBySize}}')",
+            "$sortByDate = [System.Convert]::ToBoolean('{{sortByDate}}')",
+            "$omitFolders = @({{#each omitFolders}}'{{this}}', {{/each}})",
+            "",
+            "# Function to check if a folder is in the omit list",
+            "function Is-OmittedFolder($folder) {",
+            "    return $omitFolders -contains $folder.FullName",
+            "}",
+            "",
+            "# Get the total number of directories or files for progress tracking",
+            "$totalItems = if ($searchBy -eq 'folder') {",
+            "    (Get-ChildItem -Path $folderPath -Directory -Depth 1 -ErrorAction SilentlyContinue | Where-Object { -not (Is-OmittedFolder $_) }).Count",
+            "} elseif ($searchBy -eq 'file') {",
+            "    (Get-ChildItem -Path $folderPath -File -Recurse -ErrorAction SilentlyContinue | Where-Object { -not (Is-OmittedFolder $_) }).Count",
+            "}",
+            "$counter = 0",
+            "",
+            "if ($searchBy -eq 'folder') {",
+            "    $folderSizes = Get-ChildItem -Path $folderPath -Directory -Depth 1 -ErrorAction SilentlyContinue | Where-Object { -not (Is-OmittedFolder $_) } | ForEach-Object {",
+            "        $counter++",
+            "        Write-Progress -Activity 'Processing Folders' -Status \"$counter out of $totalItems\" -PercentComplete (($counter / $totalItems) * 100)",
+            "        $folderSize = (Get-ChildItem -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum",
+            "        $lastModified = (Get-ChildItem -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime",
+            "        [PSCustomObject]@{",
+            "            FolderName = $_.FullName",
+            "            SizeInBytes = $folderSize",
+            "            Size = if ($folderSize -gt 1GB) { '{0:N2} GB' -f ($folderSize / 1GB) } else { '{0:N2} MB' -f ($folderSize / 1MB) }",
+            "            DateModified = $lastModified",
+            "        }",
+            "    }",
+            "    if ($sortBySize) {",
+            "        $folderSizes = $folderSizes | Sort-Object SizeInBytes -Descending",
+            "    } elseif ($sortByDate) {",
+            "        $folderSizes = $folderSizes | Sort-Object DateModified -Descending",
+            "    }",
+            "    $folderSizes = $folderSizes | Select-Object -First 20",
+            "    $folderSizes | Select-Object FolderName, Size, DateModified",
+            "} elseif ($searchBy -eq 'file') {",
+            "    $fileSizes = Get-ChildItem -Path $folderPath -File -Recurse -ErrorAction SilentlyContinue | Where-Object { -not (Is-OmittedFolder $_) } | ForEach-Object {",
+            "        $counter++",
+            "        Write-Progress -Activity 'Processing Files' -Status \"$counter out of $totalItems\" -PercentComplete (($counter / $totalItems) * 100)",
+            "        [PSCustomObject]@{",
+            "            FileName = $_.FullName",
+            "            SizeInBytes = $_.Length",
+            "            Size = if ($_.Length -gt 1GB) { '{0:N2} GB' -f ($_.Length / 1GB) } else { '{0:N2} MB' -f ($_.Length / 1MB) }",
+            "            DateModified = $_.LastWriteTime",
+            "        }",
+            "    }",
+            "    if ($sortBySize) {",
+            "        $fileSizes = $fileSizes | Sort-Object SizeInBytes -Descending | Select-Object -First 20",
+            "    } elseif ($sortByDate) {",
+            "        $fileSizes = $fileSizes | Sort-Object DateModified -Descending | Select-Object -First 20",
+            "    }",
+            "    $fileSizes | Select-Object FileName, Size, DateModified",
+            "}"
+          ]
+        }
+      }
+    ]
+  }
+  
