@@ -14,14 +14,16 @@
         "allowedValues": ["folder", "file"]
       },
       "sortBySize": {
-        "type": "Boolean",
-        "description": "Set to true to sort by size.",
-        "default": false
+        "type": "String",
+        "description": "Set to 'true' to sort by size.",
+        "default": "false",
+        "allowedValues": ["true", "false"]
       },
       "sortByDate": {
-        "type": "Boolean",
-        "description": "Set to true to sort by date modified.",
-        "default": true
+        "type": "String",
+        "description": "Set to 'true' to sort by date modified.",
+        "default": "true",
+        "allowedValues": ["true", "false"]
       },
       "omitFolders": {
         "type": "StringList",
