@@ -41,7 +41,7 @@
             "$searchBy = '{{searchBy}}'",
             "$sortBySize = [System.Convert]::ToBoolean('{{sortBySize}}')",
             "$sortByDate = [System.Convert]::ToBoolean('{{sortByDate}}')",
-            "$omitFolders = @({{#each omitFolders}}'{{this}}', {{/each}})",
+            "$omitFolders = @('{{omitFolders}}' -split ',')",
             "",
             "# Function to check if a folder is in the omit list",
             "function Is-OmittedFolder($folder) {",
